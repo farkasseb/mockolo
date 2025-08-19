@@ -5,6 +5,7 @@ import SwiftSyntaxMacros
 struct Fixture: MemberMacro {
     struct Arguments {
         var imports: [String]?
+        var publicCustomImports: [String]?
         var testableImports: [String]?
         var includesConcurrencyHelpers: Bool = false
     }
@@ -23,6 +24,10 @@ struct Fixture: MemberMacro {
             if argument.label?.text == "imports",
                let expr = argument.expression.as(ArrayExprSyntax.self) {
                 result.imports = try extract(stringLiteralArray: expr)
+            }
+            if argument.label?.text == "publicCustomImports",
+               let expr = argument.expression.as(ArrayExprSyntax.self) {
+                result.publicCustomImports = try extract(stringLiteralArray: expr)
             }
             if argument.label?.text == "testableImports",
                let expr = argument.expression.as(ArrayExprSyntax.self) {
@@ -85,6 +90,11 @@ struct Fixture: MemberMacro {
         if let imports = argument.imports {
             sourceContent = imports.map {
                 "\(baseIndent)\(indent)import \($0)\n"
+            }.joined() + "\n" + sourceContent
+        }
+        if let publicCustomImports = argument.publicCustomImports {
+            sourceContent = publicCustomImports.map {
+                "\(baseIndent)\(indent)public import \($0)\n"
             }.joined() + "\n" + sourceContent
         }
 

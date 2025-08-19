@@ -18,6 +18,7 @@ import Algorithms
 
 func handleImports(pathToImportsMap: ImportMap,
                    customImports: [String]?,
+                   publicCustomImports: [String]?,
                    excludeImports: [String]?,
                    testableImports: [String]?,
                    relevantPaths: [String]) -> String {
@@ -44,23 +45,62 @@ func handleImports(pathToImportsMap: ImportMap,
         }
     }
 
-    if let customImports = customImports {
-        importLines[defaultKey]?.append(contentsOf: customImports.map {$0.asImport})
-    }
-
     var sortedImports = [String: [String]]()
-    for (k, v) in importLines {
-        sortedImports[k] = Set(v).sorted()
-    }
-
-    if let existingSet = sortedImports[defaultKey] {
-        if let testableImports = testableImports {
-            let (nonTestableInList, rawTestableInList) = existingSet.partitioned(by: { testableImports.contains($0.moduleNameInImport) })
-            let testableInList = rawTestableInList.map{ "@testable " + $0 }
-            let remainingTestable = testableImports.filter { !testableInList.contains($0) }.map {$0.asTestableImport}
-            let testable = Set([testableInList, remainingTestable].flatMap{$0}).sorted()
-            sortedImports[defaultKey] = [nonTestableInList, testable].flatMap{$0}
+    
+    // Process all imports for the default key (non-conditional imports)
+    var moduleToEntry: [String: ImportEntry] = [:]
+    
+    // 1. Start with existing imports from source files
+    if let existingImports = importLines[defaultKey] {
+        for importLine in existingImports {
+            let moduleName = importLine.bareModuleName
+            let type = importLine.importType
+            if !moduleName.isEmpty {
+                moduleToEntry[moduleName] = ImportEntry(module: moduleName, type: type)
+            }
         }
+    }
+    
+    // 2. Add custom imports (replace if duplicate)
+    if let customImports = customImports {
+        for module in customImports {
+            moduleToEntry[module] = ImportEntry(module: module, type: .regular)
+        }
+    }
+    
+    // 3. Add testable imports (replace if duplicate, higher precedence)
+    if let testableImports = testableImports {
+        for module in testableImports {
+            if let existing = moduleToEntry[module] {
+                if ImportType.testable.precedence > existing.type.precedence {
+                    moduleToEntry[module] = ImportEntry(module: module, type: .testable)
+                }
+            } else {
+                moduleToEntry[module] = ImportEntry(module: module, type: .testable)
+            }
+        }
+    }
+    
+    // 4. Add public custom imports (replace if duplicate, highest precedence)
+    if let publicCustomImports = publicCustomImports {
+        for module in publicCustomImports {
+            if let existing = moduleToEntry[module] {
+                if ImportType.public.precedence > existing.type.precedence {
+                    moduleToEntry[module] = ImportEntry(module: module, type: .public)
+                }
+            } else {
+                moduleToEntry[module] = ImportEntry(module: module, type: .public)
+            }
+        }
+    }
+    
+    // 5. Sort by bare module name and format
+    let sortedEntries = moduleToEntry.values.sorted { $0.module < $1.module }
+    sortedImports[defaultKey] = sortedEntries.map { $0.formattedImport }
+    
+    // Process conditional imports (keep existing logic for these)
+    for (k, v) in importLines where k != defaultKey {
+        sortedImports[k] = Set(v).sorted()
     }
 
     let sortedKeys = sortedImports.keys.sorted()

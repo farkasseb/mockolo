@@ -43,6 +43,11 @@ struct Executor: ParsableCommand {
             help: "If set, custom module imports (separated by a space) will be added to the final import statement list.")
     private var customImports: [String] = []
 
+    @Option(name: .long,
+            parsing: .upToNextOption,
+            help: "If set, public custom module imports (separated by a space) will be added to the final import statement list with the 'public' access modifier.")
+    private var publicCustomImports: [String] = []
+
     @Flag(name: .long,
           help: "Whether to enable args history for all functions (default = false). To enable history per function, use the 'history' keyword in the annotation argument.")
     private  var enableArgsHistory: Bool = false
@@ -206,6 +211,7 @@ struct Executor: ParsableCommand {
                          mockFinal: mockFinal,
                          testableImports: testableImports,
                          customImports: customImports,
+                         publicCustomImports: publicCustomImports,
                          excludeImports: excludeImports,
                          to: outputFilePath,
                          loggingLevel: loggingLevel,

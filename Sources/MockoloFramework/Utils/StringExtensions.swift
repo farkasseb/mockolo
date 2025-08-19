@@ -267,8 +267,39 @@ extension StringProtocol {
         return "import \(self)"
     }
 
+    var asPublicImport: String {
+        return "public import \(self)"
+    }
+
     var moduleNameInImport: String {
         guard self.hasPrefix(String.importSpace) else { return "" }
         return self.dropFirst(String.importSpace.count).trimmingCharacters(in: .whitespaces)
     }
+    
+    public var bareModuleName: String {
+        let trimmed = self.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("public import ") {
+            return String(trimmed.dropFirst("public import ".count)).trimmingCharacters(in: .whitespaces)
+        } else if trimmed.hasPrefix("@testable import ") {
+            return String(trimmed.dropFirst("@testable import ".count)).trimmingCharacters(in: .whitespaces)
+        } else if trimmed.hasPrefix("import ") {
+            return String(trimmed.dropFirst("import ".count)).trimmingCharacters(in: .whitespaces)
+        } else {
+            return ""
+        }
+    }
+    
+    public var importType: ImportType {
+        let trimmed = self.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("public import ") {
+            return .public
+        } else if trimmed.hasPrefix("@testable import ") {
+            return .testable
+        } else if trimmed.hasPrefix("import ") {
+            return .regular
+        } else {
+            return .regular
+        }
+    }
+    
 }

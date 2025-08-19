@@ -738,10 +738,8 @@ final class EntityVisitor: SyntaxVisitor {
     }
 
     override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
-        if let ret = node.path.firstToken(viewMode: .sourceAccurate)?.text {
-            let desc = node.importKeyword.text + " " + ret
-            imports["", default: []].append(desc)
-        }
+        let desc = node.trimmedDescription
+        imports["", default: []].append(desc)
         return .skipChildren
     }
 

@@ -143,8 +143,10 @@ OPTIONS:
                           A custom annotation string used to indicate if a type should be mocked (default = @mockable). (default: @mockable)
   -j, --concurrency-limit <n>
                           Maximum number of threads to execute concurrently (default = number of cores on the running machine).
-  --custom-imports <custom-imports>
+  -c, --custom-imports <custom-imports>
                           If set, custom module imports (separated by a space) will be added to the final import statement list.
+  --public-custom-imports <public-custom-imports>
+                          If set, public custom module imports (separated by a space) will be added to the final import statement list with the 'public' access modifier.
   --enable-args-history   Whether to enable args history for all functions (default = false). To enable history per function, use the 'history' keyword in the annotation argument.
   --disable-combine-default-values
                           Whether to disable generating Combine streams in mocks (default = false). Set this to true to control how your streams are created in your mocks.

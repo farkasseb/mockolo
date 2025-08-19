@@ -1,7 +1,7 @@
 import XCTest
 import MockoloFramework
 
-class ImportHelpersTests: XCTestCase {
+class ImportHelpersTests: MockoloTestCase {
     
     // MARK: - bareModuleName tests
     

@@ -156,35 +156,37 @@ extension MemberBlockItemSyntax {
             if validateMember(varMember.modifiers, declKind, processed: processed) {
                 let acl = memberAcl(varMember.modifiers, encloserAcl, declKind)
                 if let item = varMember.models(with: acl, metadata: metadata, processed: processed).first {
-                    return (item, varMember.attributes.trimmedDescription, false)
+                    return (item, varMember.attributes.platformAvailableString, false)
                 }
             }
         } else if let funcMember = self.decl.as(FunctionDeclSyntax.self) {
             if validateMember(funcMember.modifiers, declKind, processed: processed) {
                 let acl = memberAcl(funcMember.modifiers, encloserAcl, declKind)
                 let item = funcMember.model(with: acl, declKind: declKind, funcsWithArgsHistory: metadata?.funcsWithArgsHistory, customModifiers: metadata?.modifiers, processed: processed)
-                return (item, funcMember.attributes.trimmedDescription, false)
+                return (item, funcMember.attributes.platformAvailableString, false)
             }
         } else if let subscriptMember = self.decl.as(SubscriptDeclSyntax.self) {
             if validateMember(subscriptMember.modifiers, declKind, processed: processed) {
                 let acl = memberAcl(subscriptMember.modifiers, encloserAcl, declKind)
                 let item = subscriptMember.model(with: acl, declKind: declKind, processed: processed)
-                return (item, subscriptMember.attributes.trimmedDescription, false)
+                return (item, subscriptMember.attributes.platformAvailableString, false)
             }
         } else if let initMember = self.decl.as(InitializerDeclSyntax.self) {
             if validateInit(initMember, declKind, processed: processed) {
                 let acl = memberAcl(initMember.modifiers, encloserAcl, declKind)
                 let item = initMember.model(with: acl, declKind: declKind, processed: processed)
-                return (item, initMember.attributes.trimmedDescription, true)
+                return (item, initMember.attributes.platformAvailableString, true)
             }
         } else if let patMember = self.decl.as(AssociatedTypeDeclSyntax.self) {
             let acl = memberAcl(patMember.modifiers, encloserAcl, declKind)
             let item = patMember.model(with: acl, declKind: declKind, overrides: metadata?.typeAliases)
-            return (item, patMember.attributes.trimmedDescription, false)
+            // Behavioral attributes are deliberately dropped: the generated typealias is referenced
+            // throughout the mock's infrastructure, so keeping them would spread warnings through generated code.
+            return (item, patMember.attributes.platformAvailableString, false)
         } else if let taMember = self.decl.as(TypeAliasDeclSyntax.self) {
             let acl = memberAcl(taMember.modifiers, encloserAcl, declKind)
             let item = taMember.model(with: acl, declKind: declKind, overrides: metadata?.typeAliases, processed: processed)
-            return (item, taMember.attributes.trimmedDescription, false)
+            return (item, taMember.attributes.platformAvailableString, false)
         } else if let ifMacroMember = self.decl.as(IfConfigDeclSyntax.self) {
             let (item, attr, initFlag) = ifMacroMember.model(with: encloserAcl, declKind: declKind, metadata: metadata, processed: processed)
             return (item, attr, initFlag)
@@ -421,6 +423,71 @@ extension AttributeListSyntax {
         }
     }
 
+    private func isBehavioralAvailable(_ element: AttributeListSyntax.Element) -> Bool {
+        guard case .attribute(let attr) = element,
+              attr.attributeName.trimmedDescription == "available",
+              case .availability(let args) = attr.arguments
+        else { return false }
+
+        // Wildcard form (`@available(*, deprecated)`, `(*, noasync)`, ...) is always behavioral.
+        if let first = args.first,
+           case .token(let token) = first.argument,
+           token.tokenKind == .binaryOperator("*") {
+            return true
+        }
+
+        // Extended platform form (`@available(iOS, deprecated: 12.0)`): behavioral only if it
+        // deprecates without gating existence. Existence-gating forms must keep hoisting to
+        // the class, since the mock's infrastructure references the member's types unconditionally.
+        var deprecates = false
+        for arg in args {
+            switch arg.argument {
+            case .availabilityVersionRestriction(let platformVersion):
+                if platformVersion.version != nil {
+                    return false
+                }
+            case .availabilityLabeledArgument(let labeled):
+                switch labeled.label.text {
+                case "deprecated":
+                    deprecates = true
+                case "introduced", "obsoleted":
+                    return false
+                default:
+                    break
+                }
+            case .token(let token):
+                switch token.text {
+                case "deprecated", "noasync":
+                    deprecates = true
+                case "unavailable":
+                    return false
+                default:
+                    break
+                }
+            }
+        }
+        return deprecates
+    }
+
+    var behavioralAvailableDescriptions: [String] {
+        self.compactMap { isBehavioralAvailable($0) ? $0.trimmedDescription : nil }
+    }
+
+    var platformAvailableString: String? {
+        let descs = platformAvailableDescriptions
+        return descs.isEmpty ? nil : descs.joined(separator: " ")
+    }
+
+    var platformAvailableDescriptions: [String] {
+        self.compactMap { element in
+            guard case .attribute(let attr) = element,
+                  attr.attributeName.trimmedDescription == "available",
+                  !isBehavioralAvailable(element)
+            else { return nil }
+            return element.trimmedDescription
+        }
+    }
+
     fileprivate var mayHaveGlobalActor: Bool {
         let wellKnownGlobalActor: Set<String> = [.mainActor]
         return self.contains { element in
@@ -505,6 +572,7 @@ extension VariableDeclSyntax {
                                  storageKind: storageKind,
                                  canBeInitParam: potentialInitParam,
                                  offset: v.offset,
+                                 attributes: self.attributes.behavioralAvailableDescriptions,
                                  rxTypes: metadata?.varTypes,
                                  customModifiers: metadata?.modifiers,
                                  getterHistory: getterHistory,
@@ -557,6 +625,7 @@ extension SubscriptDeclSyntax {
                                          isStatic: isStatic,
                                          offset: self.offset,
                                          length: self.length,
+                                         attributes: self.attributes.behavioralAvailableDescriptions,
                                          funcsWithArgsHistory: [],
                                          customModifiers: [:],
                                          modelDescription: self.description,
@@ -588,6 +657,7 @@ extension FunctionDeclSyntax {
                                     isStatic: isStatic,
                                     offset: self.offset,
                                     length: self.length,
+                                    attributes: self.attributes.behavioralAvailableDescriptions,
                                     funcsWithArgsHistory: funcsWithArgsHistory ?? [],
                                     customModifiers: customModifiers ?? [:],
                                     modelDescription: self.description,
@@ -632,6 +702,7 @@ extension InitializerDeclSyntax {
                            isStatic: false,
                            offset: self.offset,
                            length: self.length,
+                           attributes: self.attributes.behavioralAvailableDescriptions,
                            funcsWithArgsHistory: [],
                            customModifiers: [:],
                            modelDescription: self.description,

@@ -21,7 +21,7 @@ final class VariableModel: Model {
     let type: SwiftType?
     let offset: Int64
     let accessLevel: String
-    let attributes: [String]?
+    let attributes: [String]
     /// Indicates whether this model can be used as a parameter to an initializer
     let canBeInitParam: Bool
     let processed: Bool
@@ -58,6 +58,7 @@ final class VariableModel: Model {
          storageKind: MockStorageKind,
          canBeInitParam: Bool,
          offset: Int64,
+         attributes: [String] = [],
          rxTypes: [String: String]?,
          customModifiers: [String: Modifier]?,
          getterHistory: GetterHistory,
@@ -75,7 +76,7 @@ final class VariableModel: Model {
         self.customModifiers = customModifiers
         self.getterHistory = getterHistory
         self.accessLevel = acl ?? ""
-        self.attributes = nil
+        self.attributes = attributes
         self.modelDescription = modelDescription
         self.combineType = combineType
     }
@@ -114,7 +115,8 @@ final class VariableModel: Model {
                                                              encloser: enclosingType.typeName,
                                                              shouldOverride: shouldOverride,
                                                              isStatic: isStatic,
-                                                             accessLevel: accessLevel) {
+                                                             accessLevel: accessLevel,
+                                                             attributes: attributes) {
                 return combineVar
             }
         }
@@ -126,7 +128,8 @@ final class VariableModel: Model {
                                                shouldOverride: shouldOverride,
                                                allowSetCallCount: arguments.allowSetCallCount,
                                                isStatic: isStatic,
-                                               accessLevel: accessLevel) {
+                                               accessLevel: accessLevel,
+                                               attributes: attributes) {
             return rxVar
         }
 
@@ -138,6 +141,7 @@ final class VariableModel: Model {
                                      allowSetCallCount: arguments.allowSetCallCount,
                                      shouldOverride: shouldOverride,
                                      accessLevel: accessLevel,
+                                     attributes: attributes,
                                      context: context,
                                      arguments: arguments)
     }

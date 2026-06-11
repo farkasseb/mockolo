@@ -23,8 +23,10 @@ extension VariableModel {
                                allowSetCallCount: Bool,
                                shouldOverride: Bool,
                                accessLevel: String,
+                               attributes: [String],
                                context: RenderContext,
                                arguments: GenerationArguments) -> String {
+        let attrPrefix = attributes.asAttributePrefix
         let underlyingSetCallCount = "\(name)\(String.setCallCountSuffix)"
         let underlyingVarDefaultVal = type.defaultVal()
         var underlyingType = type.typeName
@@ -105,19 +107,19 @@ extension VariableModel {
             let template: String
             if underlyingVarDefaultVal == nil {
                 template = """
-                
+
                 \(setCallCountVarDecl)
                 \(1.tab)\(propertyWrapper)\(staticSpace)private var \(underlyingName): \(underlyingType)\(assignVal)\(accessorBlock)
-                \(1.tab)\(acl)\(staticSpace)\(overrideStr)\(modifierTypeStr)var \(name): \(type.typeName) {
+                \(attrPrefix)\(1.tab)\(acl)\(staticSpace)\(overrideStr)\(modifierTypeStr)var \(name): \(type.typeName) {
                 \(2.tab)get { return \(underlyingName) }
                 \(2.tab)set { \(underlyingName) = newValue }
                 \(1.tab)}
                 """
             } else {
                 template = """
-                
+
                 \(setCallCountVarDecl)
-                \(1.tab)\(propertyWrapper)\(acl)\(staticSpace)\(overrideStr)\(modifierTypeStr)var \(name): \(type.typeName)\(assignVal)\(accessorBlock)
+                \(attrPrefix)\(1.tab)\(propertyWrapper)\(acl)\(staticSpace)\(overrideStr)\(modifierTypeStr)var \(name): \(type.typeName)\(assignVal)\(accessorBlock)
                 """
             }
 
@@ -153,7 +155,7 @@ extension VariableModel {
             return """
 
             \(getCallCountVarDecl)\(1.tab)\(acl)\(staticSpace)var \(name)\(String.handlerSuffix): (() \(effects.applyTemplate())-> \(type.typeName))?
-            \(1.tab)\(acl)\(staticSpace)\(overrideStr)\(modifierTypeStr)var \(name): \(type.typeName) {
+            \(attrPrefix)\(1.tab)\(acl)\(staticSpace)\(overrideStr)\(modifierTypeStr)var \(name): \(type.typeName) {
             \(2.tab)get \(effects.applyTemplate()){
             \(getIncrement)\(body)
             \(2.tab)}
@@ -167,7 +169,9 @@ extension VariableModel {
                                       encloser: String,
                                       shouldOverride: Bool,
                                       isStatic: Bool,
-                                      accessLevel: String) -> String? {
+                                      accessLevel: String,
+                                      attributes: [String]) -> String? {
+        let attrPrefix = attributes.asAttributePrefix
         let typeName = type.typeName
 
         guard
@@ -223,7 +227,7 @@ extension VariableModel {
 
             let setErrorType = ".setFailureType(to: \(errorTypeStr).self)"
             template += """
-            \(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(typeName) { return \(thisStr).$\(wrapperPropertyName)\(mapping)\(setErrorType).\(String.eraseToAnyPublisher)() }
+            \(attrPrefix)\(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(typeName) { return \(thisStr).$\(wrapperPropertyName)\(mapping)\(setErrorType).\(String.eraseToAnyPublisher)() }
             """
             return template
         default:
@@ -244,7 +248,7 @@ extension VariableModel {
 
             let template = """
 
-            \(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(typeName) { return \(thisStr).\(underlyingSubjectName).\(String.eraseToAnyPublisher)() }
+            \(attrPrefix)\(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(typeName) { return \(thisStr).\(underlyingSubjectName).\(String.eraseToAnyPublisher)() }
             \(1.tab)\(acl)\(staticSpace)\(String.privateSet) var \(underlyingSubjectName) = \(combineSubjectType.typeName)<\(typeParamStr)>(\(defaultValue ?? ""))
             """
             return template
@@ -258,7 +262,9 @@ extension VariableModel {
                                  shouldOverride: Bool,
                                  allowSetCallCount: Bool,
                                  isStatic: Bool,
-                                 accessLevel: String) -> String? {
+                                 accessLevel: String,
+                                 attributes: [String]) -> String? {
+        let attrPrefix = attributes.asAttributePrefix
 
         let staticSpace = isStatic ? "\(String.static) " : ""
         let privateSetSpace = allowSetCallCount ? "" : "\(String.privateSet) "
@@ -293,7 +299,7 @@ extension VariableModel {
                 \(1.tab)\(acl)\(staticSpace)\(privateSetSpace)var \(underlyingSetCallCount) = 0
                 \(1.tab)\(staticSpace)var \(fallbackName): \(fallbackType)? { didSet { \(setCallCountStmt) } }
                 \(1.tab)\(acl)\(staticSpace)var \(underlyingSubjectName)\(defaultValAssignStr) { didSet { \(setCallCountStmt) } }
-                \(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(type.typeName) {
+                \(attrPrefix)\(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(type.typeName) {
                 \(2.tab)get { return \(fallbackName) ?? \(underlyingSubjectName) }
                 \(2.tab)set { if let val = newValue as? \(underlyingSubjectType) { \(underlyingSubjectName) = val } else { \(fallbackName) = newValue } }
                 \(1.tab)}
@@ -331,7 +337,7 @@ extension VariableModel {
             \(1.tab)\(acl)\(staticSpace)var \(replaySubjectName) = \(replaySubjectType).create(bufferSize: 1) { didSet { \(setCallCountStmt) } }
             \(1.tab)\(acl)\(staticSpace)var \(behaviorSubjectName): \(behaviorSubjectType)! { didSet { \(setCallCountStmt) } }
             \(1.tab)\(acl)\(staticSpace)var \(fallbackName): \(fallbackType)! { didSet { \(setCallCountStmt) } }
-            \(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(typeName) {
+            \(attrPrefix)\(1.tab)\(acl)\(staticSpace)\(overrideStr)var \(name): \(typeName) {
             \(2.tab)get {
             \(3.tab)if \(whichSubject) == 0 {
             \(4.tab)return \(publishSubjectName)
